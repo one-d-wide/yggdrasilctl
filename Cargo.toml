@@ -1,0 +1,28 @@
+[package]
+name = "yggdrasilctl"
+version = "1.0.0"
+authors = ["one-d-wide <one-d-wide@protonmail.com>"]
+categories = ["network-programming"]
+description = "Blazingly fast Yggdrasil Admin API library"
+edition = "2021"
+keywords = ["yggdrasil", "yggdrasil-network", "yggdrasilctl"]
+license = "MIT"
+repository = "https://github.com/one-d-wide/yggdrasilctl"
+resolver = "2" # Disallow feature unification
+
+[features]
+# Take `Write` and `Read` traits from `std` crate
+use_std = [ "dep:maybe-async", "maybe-async?/is_sync" ]
+# Take `AsyncWrite` and `AsyncRead` traits from `tokio` crate
+use_tokio = [ "dep:maybe-async", "dep:tokio" ]
+# Take `AsyncWrite` and `AsyncRead` traits from `futures` crate
+use_futures = [ "dep:maybe-async",  "dep:futures" ]
+default = [ "use_std" ]
+
+[dependencies]
+serde = { version = "1", features = [ "derive" ] }
+serde_json = "1"
+maybe-async = { version = "0", optional = true }
+# Async runtime
+futures = { version = "0", optional = true }
+tokio = { version = "1", features = [ "io-util", "net", "macros", "rt" ], optional = true }
