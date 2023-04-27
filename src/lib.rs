@@ -35,13 +35,25 @@ pub type RequestResult<T> = io::Result<Result<T, String>>;
 
 pub struct Endpoint<S> {
     socket: BufReader<S>,
+    // Before v0.4.5
+    // Breaking commit: https://github.com/yggdrasil-network/yggdrasil-go/commit/b67c313f449427845b46da123f4767683fdf83b3
+    old_router: bool,
 }
 
 impl<S: AsyncWrite + AsyncRead + Unpin> Endpoint<S> {
-    pub fn attach(socket: S) -> Self {
-        Self {
+    #[maybe_async]
+    pub async fn attach(socket: S) -> Self {
+        let mut endpoint = Self {
             socket: BufReader::new(socket),
+            old_router: false,
+        };
+        // Routers before v0.4.5 had "self.<addr>.<entry>" structure
+        if let Ok(Ok(val)) = endpoint.request::<Value>("getself").await {
+            if let Some(_) = val.get("self") {
+                endpoint.old_router = true;
+            }
         }
+        endpoint
     }
 
     pub fn into_inner(self) -> S {
@@ -96,7 +108,10 @@ impl<S: AsyncWrite + AsyncRead + Unpin> Endpoint<S> {
                 let parsed = result.map_err(|err| {
                     Error::new(
                         ErrorKind::InvalidData,
-                        format!("While parsing endpoint response: {err}"),
+                        format!(
+                            "While parsing endpoint response for request '{}': {err}",
+                            request.request
+                        ),
                     )
                 })?;
                 let consumed = stream.byte_offset() + 1;
@@ -159,26 +174,28 @@ mod tests {
 
     #[maybe_async]
     async fn request<S: AsyncWrite + AsyncRead + Unpin>(e: S) {
-        let mut e = Endpoint::attach(e);
-        let err = e.request::<SelfEntry>("getself").await;
-        assert!(!err.unwrap().unwrap().build_name.is_empty());
+        let mut e = Endpoint::attach(e).await;
+        if !e.old_router {
+            let err = e.request::<SelfEntry>("getself").await;
+            assert!(!err.unwrap().unwrap().build_name.is_empty());
+            e.remove_peer("tcp://[::]:0".to_string(), None).await.ok();
+            e.add_peer("tcp://[::]:0".to_string(), None)
+                .await
+                .unwrap()
+                .unwrap();
+            e.remove_peer("tcp://[::]:0".to_string(), None)
+                .await
+                .unwrap()
+                .unwrap();
+            e.get_tun().await.unwrap().unwrap();
+        }
         e.get_peers().await.unwrap().unwrap();
         e.get_sessions().await.unwrap().unwrap();
-        e.remove_peer("tcp://[::]:0".to_string(), None).await.ok();
-        e.add_peer("tcp://[::]:0".to_string(), None)
-            .await
-            .unwrap()
-            .unwrap();
-        e.remove_peer("tcp://[::]:0".to_string(), None)
-            .await
-            .unwrap()
-            .unwrap();
         e.get_self().await.unwrap().unwrap();
         e.get_paths().await.unwrap().unwrap();
         e.get_dht().await.unwrap().unwrap();
         e.get_node_info("".to_string()).await.unwrap().ok();
         e.get_multicast_interfaces().await.unwrap().unwrap();
-        e.get_tun().await.unwrap().unwrap();
         e.list().await.unwrap().unwrap();
     }
 }

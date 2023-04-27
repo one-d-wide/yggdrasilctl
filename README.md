@@ -11,6 +11,10 @@ runtime is not in the list, consider filing an issue or pull request.
 [Admin API]: https://yggdrasil-network.github.io/admin.html
 [Yggdrasil network router]: https://github.com/yggdrasil-network/yggdrasil-go
 
+# Compatibility
+
+In version `0.4.5` of `yggdrasil-go` (October 2022), a new API call scheme was intoduced for commands: `getpeers`, `getsessions`, `getself`, `getpaths`, `getdht`, `list`. New commands: `addpeer`, `removepeer` and `gettun`. And API extentions, for example `uptime` attribute in `SessionEntry`. `Old_router` API is supported and automatically detected in the `Endpoint::attach` function with further translation engaged. Note that missing fields are silently populated with `0`. Tested versions include `0.4.4`, `0.4.7`. You can test your setup yourself by running `cargo test -p yggdrasilctl` in the crate directory.
+
 # Basic usage
 
 Add either line to your dependencies in `Cargo.toml`
@@ -25,7 +29,7 @@ yggdrasilctl = { version = "1", default-features = false, features = [ "use_toki
 
 Next:
 
-```rust
+```rust,ignore
 use yggdrasilctl::Endpoint;
 use std::os::unix::net::UnixStream;
 
@@ -62,7 +66,7 @@ serde_json = "1"
 
 Next:
 
-```rust
+```rust,ignore
 use yggdrasilctl::Endpoint;
 use serde::Deserialize;
 use serde_json::Value;
