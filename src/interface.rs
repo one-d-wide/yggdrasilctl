@@ -1,44 +1,60 @@
 use super::*;
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct PeerEntry {
-    pub address: Ipv6Addr,
-    pub key: String,
-    pub port: u64,
-    pub priority: u64,
-    pub coords: Vec<u64>,
-    pub remote: String,
-    pub bytes_recvd: u64,
-    pub bytes_sent: u64,
-    pub uptime: f64,
+fn parse_optional_duration_from_nanos<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Option<Duration>, D::Error> {
+    u64::deserialize(deserializer).map(|nanos| Some(Duration::from_nanos(nanos)))
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PeerEntry {
+    pub address: Option<Ipv6Addr>,
+    pub key: String,
+    pub port: u64,
+    pub priority: Option<u64>,
+    pub remote: Option<String>,
+    pub bytes_recvd: Option<u64>,
+    pub bytes_sent: Option<u64>,
+    pub uptime: Option<f64>,
+    pub up: bool,
+    pub inbound: bool,
+    pub last_error: Option<String>,
+    #[serde(default, deserialize_with = "parse_optional_duration_from_nanos")]
+    pub last_error_time: Option<Duration>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct SessionEntry {
     pub address: Ipv6Addr,
     pub key: String,
-    pub bytes_recvd: u64,
-    pub bytes_sent: u64,
-    pub uptime: f64,
+    pub bytes_recvd: Option<u64>,
+    pub bytes_sent: Option<u64>,
+    pub uptime: Option<f64>,
 }
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct SelfEntry {
     pub build_name: String,
     pub build_version: String,
     pub key: String,
     pub address: Ipv6Addr,
-    pub coords: Vec<u64>,
     pub subnet: String,
+    pub routing_entries: Option<u64>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct PathEntry {
     pub address: Ipv6Addr,
     pub key: String,
     pub path: Vec<u64>,
+    pub sequence: Option<u64>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct DHTEntry {
     pub address: Ipv6Addr,
     pub key: String,
@@ -47,6 +63,7 @@ pub struct DHTEntry {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct TunEntry {
     pub enabled: bool,
     pub name: Option<String>,
@@ -54,6 +71,16 @@ pub struct TunEntry {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TreeEntry {
+    pub address: Ipv6Addr,
+    pub key: String,
+    pub parent: String,
+    pub sequence: u64,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ListEntry {
     pub command: String,
     pub description: String,
@@ -61,84 +88,145 @@ pub struct ListEntry {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Empty {}
 
 impl<S: AsyncWrite + AsyncRead + Unpin> Endpoint<S> {
     #[maybe_async]
     pub async fn get_peers(&mut self) -> RequestResult<Vec<PeerEntry>> {
-        if self.old_router {
-            #[derive(Debug, Deserialize)]
-            struct Entry {
-                port: u64,
-                key: String,
-                coords: Vec<u64>,
-                remote: String,
-                bytes_recvd: u64,
-                bytes_sent: u64,
-                uptime: f64,
-            }
-            #[derive(Debug, Deserialize)]
-            struct Peers {
-                peers: HashMap<Ipv6Addr, Entry>,
-            }
-            return match self.request::<Peers>("getpeers").await? {
-                Ok(peers) => {
-                    let mut vec: Vec<PeerEntry> = Vec::new();
-                    for (k, v) in peers.peers {
-                        vec.push(PeerEntry {
-                            address: k,
-                            key: v.key,
-                            port: v.port,
-                            coords: v.coords,
-                            remote: v.remote,
-                            uptime: v.uptime,
-                            bytes_recvd: v.bytes_recvd,
-                            bytes_sent: v.bytes_sent,
-                            priority: 0,
-                        });
-                    }
-                    Ok(Ok(vec))
+        match self.router_version {
+            RouterVersion::__v0_4_4 => {
+                #[derive(Debug, Deserialize)]
+                #[serde(deny_unknown_fields)]
+                struct Entry {
+                    port: u64,
+                    key: String,
+                    #[allow(dead_code)]
+                    coords: Vec<u64>,
+                    remote: String,
+                    bytes_recvd: u64,
+                    bytes_sent: u64,
+                    uptime: f64,
                 }
-                Err(err) => Ok(Err(err)),
-            };
+                #[derive(Debug, Deserialize)]
+                #[serde(deny_unknown_fields)]
+                struct Peers {
+                    peers: HashMap<Ipv6Addr, Entry>,
+                }
+                match self.request::<Peers>("getpeers").await? {
+                    Ok(peers) => {
+                        let vec = peers
+                            .peers
+                            .into_iter()
+                            .map(|(k, v)| PeerEntry {
+                                address: Some(k),
+                                key: v.key,
+                                port: v.port,
+                                remote: Some(v.remote),
+                                uptime: Some(v.uptime),
+                                bytes_recvd: Some(v.bytes_recvd),
+                                bytes_sent: Some(v.bytes_sent),
+                                priority: None,
+                                up: true,
+                                inbound: false,
+                                last_error: None,
+                                last_error_time: None,
+                            })
+                            .collect();
+                        Ok(Ok(vec))
+                    }
+                    Err(err) => Ok(Err(err)),
+                }
+            }
+            RouterVersion::v0_4_5__v0_4_7 => {
+                #[derive(Debug, Serialize, Deserialize)]
+                #[serde(deny_unknown_fields)]
+                pub struct Entry {
+                    pub address: Ipv6Addr,
+                    pub key: String,
+                    pub port: u64,
+                    pub priority: u64,
+                    pub coords: Vec<u64>,
+                    pub remote: String,
+                    pub bytes_recvd: u64,
+                    pub bytes_sent: u64,
+                    pub uptime: f64,
+                }
+                #[derive(Debug, Deserialize)]
+                #[serde(deny_unknown_fields)]
+                struct Peers {
+                    peers: Vec<Entry>,
+                }
+                match self.request::<Peers>("getpeers").await? {
+                    Ok(peers) => {
+                        let vec = peers
+                            .peers
+                            .into_iter()
+                            .map(|v| PeerEntry {
+                                address: Some(v.address),
+                                key: v.key,
+                                port: v.port,
+                                remote: Some(v.remote),
+                                uptime: Some(v.uptime),
+                                bytes_recvd: Some(v.bytes_recvd),
+                                bytes_sent: Some(v.bytes_sent),
+                                priority: None,
+                                up: true,
+                                inbound: false,
+                                last_error: None,
+                                last_error_time: None,
+                            })
+                            .collect();
+                        Ok(Ok(vec))
+                    }
+                    Err(err) => Ok(Err(err)),
+                }
+            }
+            RouterVersion::v0_5_0__ => {
+                #[derive(Debug, Deserialize)]
+                #[serde(deny_unknown_fields)]
+                struct Peers {
+                    peers: Vec<PeerEntry>,
+                }
+                self.request::<Peers>("getpeers")
+                    .await
+                    .map(|e| e.map(|e| e.peers))
+            }
         }
-        #[derive(Debug, Deserialize)]
-        struct Peers {
-            peers: Vec<PeerEntry>,
-        }
-        self.request::<Peers>("getpeers")
-            .await
-            .map(|e| e.map(|e| e.peers))
     }
     #[maybe_async]
     pub async fn get_sessions(&mut self) -> RequestResult<Vec<SessionEntry>> {
-        if self.old_router {
+        if let RouterVersion::__v0_4_4 = self.router_version {
             #[derive(Debug, Deserialize)]
+            #[serde(deny_unknown_fields)]
             struct Entry {
                 key: String,
             }
             #[derive(Debug, Deserialize)]
+            #[serde(deny_unknown_fields)]
             struct Sessions {
                 sessions: HashMap<Ipv6Addr, Entry>,
             }
             return match self.request::<Sessions>("getsessions").await? {
                 Ok(sessions) => {
-                    let mut vec: Vec<SessionEntry> = Vec::new();
-                    for (k, v) in sessions.sessions {
-                        vec.push(SessionEntry {
+                    let vec = sessions
+                        .sessions
+                        .into_iter()
+                        .map(|(k, v)| SessionEntry {
                             address: k,
                             key: v.key,
-                            bytes_recvd: 0,
-                            bytes_sent: 0,
-                            uptime: 0.0,
-                        });
-                    }
+                            bytes_recvd: None,
+                            bytes_sent: None,
+                            uptime: None,
+                        })
+                        .collect();
                     Ok(Ok(vec))
                 }
                 Err(err) => Ok(Err(err)),
             };
         }
         #[derive(Debug, Deserialize)]
+        #[serde(deny_unknown_fields)]
         struct Sessions {
             sessions: Vec<SessionEntry>,
         }
@@ -152,10 +240,11 @@ impl<S: AsyncWrite + AsyncRead + Unpin> Endpoint<S> {
         uri: String,
         interface: Option<String>,
     ) -> RequestResult<Empty> {
-        let mut args = HashMap::<String, Value>::new();
-        args.insert("uri".to_string(), Value::from(uri));
+        let mut args = hash_map! {
+            ("uri".into()): uri.into()
+        };
         if let Some(interface) = interface {
-            args.insert("interface".to_string(), Value::from(interface));
+            args.insert("interface".into(), interface.into());
         }
         self.request_args("addpeer", args).await
     }
@@ -165,129 +254,177 @@ impl<S: AsyncWrite + AsyncRead + Unpin> Endpoint<S> {
         uri: String,
         interface: Option<String>,
     ) -> RequestResult<Empty> {
-        let mut args = HashMap::<String, Value>::new();
-        args.insert("uri".to_string(), Value::from(uri));
+        let mut args = hash_map! {
+            ("uri".into()): uri.into()
+        };
         if let Some(interface) = interface {
-            args.insert("interface".to_string(), Value::from(interface));
+            args.insert("interface".into(), interface.into());
         }
         self.request_args("removepeer", args).await
     }
     #[maybe_async]
     pub async fn get_self(&mut self) -> RequestResult<SelfEntry> {
-        if self.old_router {
-            #[derive(Debug, Deserialize)]
-            struct Entry {
-                build_name: String,
-                build_version: String,
-                key: String,
-                coords: Vec<u64>,
-                subnet: String,
-            }
-            #[derive(Debug, Deserialize)]
-            struct _SelfEntry {
-                #[serde(alias = "self")]
-                entry: HashMap<Ipv6Addr, Entry>,
-            }
-            return match self.request::<_SelfEntry>("getself").await? {
-                Ok(entry) => {
-                    for (k, v) in entry.entry {
-                        return Ok(Ok(SelfEntry {
+        match self.router_version {
+            RouterVersion::__v0_4_4 => {
+                #[derive(Debug, Deserialize)]
+                #[serde(deny_unknown_fields)]
+                struct Entry {
+                    build_name: String,
+                    build_version: String,
+                    key: String,
+                    #[allow(dead_code)]
+                    coords: Vec<u64>,
+                    subnet: String,
+                }
+                #[derive(Debug, Deserialize)]
+                #[serde(deny_unknown_fields)]
+                struct _SelfEntry {
+                    #[serde(alias = "self")]
+                    entry: HashMap<Ipv6Addr, Entry>,
+                }
+                match self.request::<_SelfEntry>("getself").await? {
+                    Ok(entry) => match entry.entry.into_iter().next() {
+                        Some((k, v)) => Ok(Ok(SelfEntry {
                             address: k,
                             key: v.key,
                             build_name: v.build_name,
                             build_version: v.build_version,
-                            coords: v.coords,
                             subnet: v.subnet,
-                        }));
-                    }
-                    Ok(Err("Unknown".to_string()))
+                            routing_entries: None,
+                        })),
+                        None => Ok(Err("Unknown".to_string())),
+                    },
+                    Err(err) => Ok(Err(err)),
                 }
-                Err(err) => Ok(Err(err)),
-            };
+            }
+            RouterVersion::v0_4_5__v0_4_7 => {
+                #[derive(Debug, Serialize, Deserialize)]
+                #[serde(deny_unknown_fields)]
+                pub struct Entry {
+                    pub build_name: String,
+                    pub build_version: String,
+                    pub key: String,
+                    pub address: Ipv6Addr,
+                    #[allow(dead_code)]
+                    pub coords: Vec<u64>,
+                    pub subnet: String,
+                }
+                match self.request::<Entry>("getself").await? {
+                    Ok(v) => Ok(Ok(SelfEntry {
+                        address: v.address,
+                        key: v.key,
+                        build_name: v.build_name,
+                        build_version: v.build_version,
+                        subnet: v.subnet,
+                        routing_entries: None,
+                    })),
+                    Err(v) => Ok(Err(v)),
+                }
+            }
+            RouterVersion::v0_5_0__ => self.request("getself").await,
         }
-        self.request("getself").await
     }
     #[maybe_async]
     pub async fn get_paths(&mut self) -> RequestResult<Vec<PathEntry>> {
-        if self.old_router {
-            #[derive(Debug, Deserialize)]
-            struct Entry {
-                key: String,
-                path: Vec<u64>,
-            }
-            #[derive(Debug, Deserialize)]
-            struct Paths {
-                paths: HashMap<Ipv6Addr, Entry>,
-            }
-            return match self.request::<Paths>("getpaths").await? {
-                Ok(paths) => {
-                    let mut vec: Vec<PathEntry> = Vec::new();
-                    for (k, v) in paths.paths {
-                        vec.push(PathEntry {
-                            address: k,
-                            key: v.key,
-                            path: v.path,
-                        });
-                    }
-                    Ok(Ok(vec))
+        match self.router_version {
+            RouterVersion::__v0_4_4 => {
+                #[derive(Debug, Deserialize)]
+                #[serde(deny_unknown_fields)]
+                struct Entry {
+                    key: String,
+                    path: Vec<u64>,
                 }
-                Err(err) => Ok(Err(err)),
-            };
+                #[derive(Debug, Deserialize)]
+                #[serde(deny_unknown_fields)]
+                struct Paths {
+                    paths: HashMap<Ipv6Addr, Entry>,
+                }
+                match self.request::<Paths>("getpaths").await? {
+                    Ok(paths) => {
+                        let vec = paths
+                            .paths
+                            .into_iter()
+                            .map(|(k, v)| PathEntry {
+                                address: k,
+                                key: v.key,
+                                path: v.path,
+                                sequence: None,
+                            })
+                            .collect();
+                        Ok(Ok(vec))
+                    }
+                    Err(err) => Ok(Err(err)),
+                }
+            }
+            RouterVersion::v0_4_5__v0_4_7 | RouterVersion::v0_5_0__ => {
+                #[derive(Debug, Deserialize)]
+                #[serde(deny_unknown_fields)]
+                struct Paths {
+                    paths: Vec<PathEntry>,
+                }
+                self.request::<Paths>("getpaths")
+                    .await
+                    .map(|e| e.map(|e| e.paths))
+            }
         }
-        #[derive(Debug, Deserialize)]
-        struct Paths {
-            paths: Vec<PathEntry>,
-        }
-        self.request::<Paths>("getpaths")
-            .await
-            .map(|e| e.map(|e| e.paths))
     }
     #[maybe_async]
     pub async fn get_dht(&mut self) -> RequestResult<Vec<DHTEntry>> {
-        if self.old_router {
-            #[derive(Debug, Deserialize)]
-            struct Entry {
-                key: String,
-                pub port: u64,
-                pub rest: u64,
-            }
-            #[derive(Debug, Deserialize)]
-            struct DHT {
-                dht: HashMap<Ipv6Addr, Entry>,
-            }
-            return match self.request::<DHT>("getdht").await? {
-                Ok(dht) => {
-                    let mut vec: Vec<DHTEntry> = Vec::new();
-                    for (k, v) in dht.dht {
-                        vec.push(DHTEntry {
-                            address: k,
-                            key: v.key,
-                            port: v.port,
-                            rest: v.rest,
-                        });
-                    }
-                    Ok(Ok(vec))
+        match self.router_version {
+            RouterVersion::__v0_4_4 => {
+                #[derive(Debug, Deserialize)]
+                #[serde(deny_unknown_fields)]
+                struct Entry {
+                    key: String,
+                    pub port: u64,
+                    pub rest: u64,
                 }
-                Err(err) => Ok(Err(err)),
-            };
+                #[derive(Debug, Deserialize)]
+                #[serde(deny_unknown_fields)]
+                struct Dht {
+                    dht: HashMap<Ipv6Addr, Entry>,
+                }
+                match self.request::<Dht>("getdht").await? {
+                    Ok(dht) => {
+                        let vec = dht
+                            .dht
+                            .into_iter()
+                            .map(|(k, v)| DHTEntry {
+                                address: k,
+                                key: v.key,
+                                port: v.port,
+                                rest: v.rest,
+                            })
+                            .collect();
+                        Ok(Ok(vec))
+                    }
+                    Err(err) => Ok(Err(err)),
+                }
+            }
+            // Not implemented in the router after v0.5.0
+            RouterVersion::v0_4_5__v0_4_7 | RouterVersion::v0_5_0__ => {
+                #[derive(Debug, Deserialize)]
+                #[serde(deny_unknown_fields)]
+                struct Dht {
+                    dht: Vec<DHTEntry>,
+                }
+                self.request::<Dht>("getdht")
+                    .await
+                    .map(|e| e.map(|e| e.dht))
+            }
         }
-        #[derive(Debug, Deserialize)]
-        struct DHT {
-            dht: Vec<DHTEntry>,
-        }
-        self.request::<DHT>("getdht")
-            .await
-            .map(|e| e.map(|e| e.dht))
     }
     #[maybe_async]
     pub async fn get_node_info(&mut self, key: String) -> RequestResult<HashMap<String, Value>> {
-        let mut args = HashMap::new();
-        args.insert("key".to_string(), Value::from(key));
+        let args = hash_map! {
+            ("key".into()): key.into()
+        };
         self.request_args("getnodeinfo", args).await
     }
     #[maybe_async]
     pub async fn get_multicast_interfaces(&mut self) -> RequestResult<Vec<String>> {
         #[derive(Debug, Deserialize)]
+        #[serde(deny_unknown_fields)]
         struct MulticastInterfaces {
             multicast_interfaces: Vec<String>,
         }
@@ -300,32 +437,47 @@ impl<S: AsyncWrite + AsyncRead + Unpin> Endpoint<S> {
         self.request("gettun").await
     }
     #[maybe_async]
+    pub async fn get_tree(&mut self) -> RequestResult<Vec<TreeEntry>> {
+        #[derive(Debug, Deserialize)]
+        #[serde(deny_unknown_fields)]
+        struct Tree {
+            tree: Vec<TreeEntry>,
+        }
+        self.request::<Tree>("gettree")
+            .await
+            .map(|t| t.map(|r| r.tree))
+    }
+    #[maybe_async]
     pub async fn list(&mut self) -> RequestResult<Vec<ListEntry>> {
-        if self.old_router {
+        if let RouterVersion::__v0_4_4 = self.router_version {
             #[derive(Debug, Deserialize)]
+            #[serde(deny_unknown_fields)]
             struct Entry {
                 fields: Vec<String>,
             }
             #[derive(Debug, Deserialize)]
+            #[serde(deny_unknown_fields)]
             struct List {
                 list: HashMap<String, Entry>,
             }
             return match self.request::<List>("list").await? {
                 Ok(list) => {
-                    let mut vec: Vec<ListEntry> = Vec::new();
-                    for (k, v) in list.list {
-                        vec.push(ListEntry {
+                    let vec = list
+                        .list
+                        .into_iter()
+                        .map(|(k, v)| ListEntry {
                             command: k,
                             description: String::new(),
                             fields: Some(v.fields),
-                        });
-                    }
+                        })
+                        .collect();
                     Ok(Ok(vec))
                 }
                 Err(err) => Ok(Err(err)),
             };
         }
         #[derive(Debug, Deserialize)]
+        #[serde(deny_unknown_fields)]
         struct List {
             list: Vec<ListEntry>,
         }

@@ -1,17 +1,32 @@
 #![doc = include_str!("../README.md")]
 
+// Hash map macro. Taken from `https://stackoverflow.com/a/71541479`
+macro_rules! hash_map{
+    ( $($key:tt : $val:expr),* $(,)? ) =>{{
+        #[allow(unused_mut)]
+        let mut map = ::std::collections::HashMap::with_capacity(hash_map!(@count $($key),* ));
+        $(
+            #[allow(unused_parens)]
+            let _ = map.insert($key, $val);
+        )*
+        map
+    }};
+    (@replace $_t:tt $e:expr ) => { $e };
+    (@count $($t:tt)*) => { <[()]>::len(&[$( hash_map!(@replace $t ()) ),*]) }
+}
+
 mod interface;
 pub use interface::*;
 
 #[cfg(feature = "use_std")]
 #[cfg(any(feature = "use_tokio", feature = "use_futures"))]
 compile_error!(
-    "Can't use `std` and async runtime simultaneously. Consider adding `default-features = false` to depency declaration"
+    "Can't use `std` and async runtime simultaneously. Consider adding `default-features = false` to the `yggdrasilctl` flags"
 );
 
 #[cfg(all(feature = "use_tokio", feature = "use_futures"))]
 compile_error!(
-    "Feature \"use_tokio\" and feature \"use_futures\" cannot be enabled at the same time"
+    "\"use_tokio\" and \"use_futures\" features can't be enabled at the same time. Consider choosing only one"
 );
 
 // std
@@ -28,32 +43,65 @@ use {
     maybe_async::maybe_async,
     serde::{Deserialize, Serialize},
     serde_json::Value,
-    std::{collections::HashMap, io, io::Error, io::ErrorKind, net::Ipv6Addr},
+    std::{collections::HashMap, io, io::Error, io::ErrorKind, net::Ipv6Addr, time::Duration},
 };
 
 pub type RequestResult<T> = io::Result<Result<T, String>>;
 
+#[derive(Clone, PartialEq, Debug)]
+#[allow(non_camel_case_types)]
+pub enum RouterVersion {
+    __v0_4_4,
+    v0_4_5__v0_4_7,
+    v0_5_0__,
+}
+
+#[derive(Debug)]
 pub struct Endpoint<S> {
     socket: BufReader<S>,
-    // Before v0.4.5
-    // Breaking commit: https://github.com/yggdrasil-network/yggdrasil-go/commit/b67c313f449427845b46da123f4767683fdf83b3
-    old_router: bool,
+    router_version: RouterVersion,
 }
 
 impl<S: AsyncWrite + AsyncRead + Unpin> Endpoint<S> {
     #[maybe_async]
     pub async fn attach(socket: S) -> Self {
+        // Assume router is of last known version
         let mut endpoint = Self {
             socket: BufReader::new(socket),
-            old_router: false,
+            router_version: RouterVersion::v0_5_0__,
         };
-        // Routers before v0.4.5 had "self.<addr>.<entry>" structure
+
         if let Ok(Ok(val)) = endpoint.request::<Value>("getself").await {
-            if let Some(_) = val.get("self") {
-                endpoint.old_router = true;
+            // Routers before v0.4.5 (response contains ".self.<addr>.build_version")
+            if val.get("self").is_some() {
+                endpoint.router_version = RouterVersion::__v0_4_4;
+                return endpoint;
+            }
+
+            // Routers from v0.4.5 to v0.4.* (".build_version")
+            if let Some(v) = val.get("build_version") {
+                if let Some(v) = v.as_str() {
+                    let v: Vec<i32> = v.split('.').filter_map(|i| str::parse(i).ok()).collect();
+                    if v.len() == 3 && v[0] == 0 && v[1] == 4 {
+                        endpoint.router_version = RouterVersion::v0_4_5__v0_4_7;
+                        return endpoint;
+                    }
+                }
             }
         }
+
         endpoint
+    }
+
+    pub fn attach_version(socket: S, router_version: RouterVersion) -> Self {
+        Self {
+            socket: BufReader::new(socket),
+            router_version,
+        }
+    }
+
+    pub fn get_version(&self) -> RouterVersion {
+        self.router_version.clone()
     }
 
     pub fn into_inner(self) -> S {
@@ -70,7 +118,7 @@ impl<S: AsyncWrite + AsyncRead + Unpin> Endpoint<S> {
 
     #[maybe_async]
     pub async fn request<T: for<'a> Deserialize<'a>>(&mut self, request: &str) -> RequestResult<T> {
-        self.request_args::<T>(request, HashMap::new()).await
+        self.request_args::<T>(request, hash_map!()).await
     }
 
     #[maybe_async]
@@ -147,7 +195,7 @@ mod protocol {
 #[cfg(test)]
 mod tests {
     use super::*;
-    const SOCKET_PATH: &str = "/var/run/yggdrasil/yggdrasil.sock";
+    const SOCKET_PATH: &str = "/run/yggdrasil/yggdrasil.sock";
 
     #[cfg(feature = "use_std")]
     #[test]
@@ -175,9 +223,19 @@ mod tests {
     #[maybe_async]
     async fn request<S: AsyncWrite + AsyncRead + Unpin>(e: S) {
         let mut e = Endpoint::attach(e).await;
-        if !e.old_router {
-            let err = e.request::<SelfEntry>("getself").await;
+
+        if let RouterVersion::v0_4_5__v0_4_7 = e.get_version() {
+            e.get_dht().await.unwrap().unwrap();
+        }
+
+        if let RouterVersion::v0_4_5__v0_4_7 | RouterVersion::v0_5_0__ = e.get_version() {
+            #[derive(Debug, Deserialize)]
+            struct _SelfEntry {
+                build_name: String,
+            }
+            let err = e.request::<_SelfEntry>("getself").await;
             assert!(!err.unwrap().unwrap().build_name.is_empty());
+
             e.remove_peer("tcp://[::]:0".to_string(), None).await.ok();
             e.add_peer("tcp://[::]:0".to_string(), None)
                 .await
@@ -189,11 +247,15 @@ mod tests {
                 .unwrap();
             e.get_tun().await.unwrap().unwrap();
         }
+
+        if let RouterVersion::v0_5_0__ = e.get_version() {
+            e.get_tree().await.unwrap().unwrap();
+        }
+
         e.get_peers().await.unwrap().unwrap();
         e.get_sessions().await.unwrap().unwrap();
         e.get_self().await.unwrap().unwrap();
         e.get_paths().await.unwrap().unwrap();
-        e.get_dht().await.unwrap().unwrap();
         e.get_node_info("".to_string()).await.unwrap().ok();
         e.get_multicast_interfaces().await.unwrap().unwrap();
         e.list().await.unwrap().unwrap();
