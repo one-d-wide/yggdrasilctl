@@ -81,7 +81,7 @@ impl<S: AsyncWrite + AsyncRead + Unpin> Endpoint<S> {
             // Routers from v0.4.5 to v0.4.* (".build_version")
             if let Some(v) = val.get("build_version") {
                 if let Some(v) = v.as_str() {
-                    let v: Vec<i32> = v.split('.').filter_map(|i| str::parse(i).ok()).collect();
+                    let v: Vec<i32> = v.split(['.', '-'].as_slice()).take(3).filter_map(|i| str::parse(i).ok()).collect();
                     if v.len() == 3 && v[0] == 0 && v[1] == 4 {
                         endpoint.router_version = RouterVersion::v0_4_5__v0_4_7;
                         return endpoint;
