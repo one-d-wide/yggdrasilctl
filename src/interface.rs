@@ -7,7 +7,7 @@ fn parse_optional_duration_from_nanos<'de, D: serde::Deserializer<'de>>(
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[cfg_attr(test, serde(deny_unknown_fields))]
 pub struct PeerEntry {
     pub address: Option<Ipv6Addr>,
     pub key: String,
@@ -25,7 +25,7 @@ pub struct PeerEntry {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[cfg_attr(test, serde(deny_unknown_fields))]
 pub struct SessionEntry {
     pub address: Ipv6Addr,
     pub key: String,
@@ -34,7 +34,7 @@ pub struct SessionEntry {
     pub uptime: Option<f64>,
 }
 #[derive(Debug, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[cfg_attr(test, serde(deny_unknown_fields))]
 pub struct SelfEntry {
     pub build_name: String,
     pub build_version: String,
@@ -45,7 +45,7 @@ pub struct SelfEntry {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[cfg_attr(test, serde(deny_unknown_fields))]
 pub struct PathEntry {
     pub address: Ipv6Addr,
     pub key: String,
@@ -54,7 +54,7 @@ pub struct PathEntry {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[cfg_attr(test, serde(deny_unknown_fields))]
 pub struct DHTEntry {
     pub address: Ipv6Addr,
     pub key: String,
@@ -63,7 +63,7 @@ pub struct DHTEntry {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[cfg_attr(test, serde(deny_unknown_fields))]
 pub struct TunEntry {
     pub enabled: bool,
     pub name: Option<String>,
@@ -71,7 +71,7 @@ pub struct TunEntry {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[cfg_attr(test, serde(deny_unknown_fields))]
 pub struct TreeEntry {
     pub address: Ipv6Addr,
     pub key: String,
@@ -80,7 +80,7 @@ pub struct TreeEntry {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[cfg_attr(test, serde(deny_unknown_fields))]
 pub struct ListEntry {
     pub command: String,
     pub description: String,
@@ -88,7 +88,7 @@ pub struct ListEntry {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[cfg_attr(test, serde(deny_unknown_fields))]
 pub struct Empty {}
 
 impl<S: AsyncWrite + AsyncRead + Unpin> Endpoint<S> {
@@ -97,7 +97,7 @@ impl<S: AsyncWrite + AsyncRead + Unpin> Endpoint<S> {
         match self.router_version {
             RouterVersion::__v0_4_4 => {
                 #[derive(Debug, Deserialize)]
-                #[serde(deny_unknown_fields)]
+                #[cfg_attr(test, serde(deny_unknown_fields))]
                 struct Entry {
                     port: u64,
                     key: String,
@@ -109,7 +109,7 @@ impl<S: AsyncWrite + AsyncRead + Unpin> Endpoint<S> {
                     uptime: f64,
                 }
                 #[derive(Debug, Deserialize)]
-                #[serde(deny_unknown_fields)]
+                #[cfg_attr(test, serde(deny_unknown_fields))]
                 struct Peers {
                     peers: HashMap<Ipv6Addr, Entry>,
                 }
@@ -140,7 +140,7 @@ impl<S: AsyncWrite + AsyncRead + Unpin> Endpoint<S> {
             }
             RouterVersion::v0_4_5__v0_4_7 => {
                 #[derive(Debug, Serialize, Deserialize)]
-                #[serde(deny_unknown_fields)]
+                #[cfg_attr(test, serde(deny_unknown_fields))]
                 pub struct Entry {
                     pub address: Ipv6Addr,
                     pub key: String,
@@ -153,7 +153,7 @@ impl<S: AsyncWrite + AsyncRead + Unpin> Endpoint<S> {
                     pub uptime: f64,
                 }
                 #[derive(Debug, Deserialize)]
-                #[serde(deny_unknown_fields)]
+                #[cfg_attr(test, serde(deny_unknown_fields))]
                 struct Peers {
                     peers: Vec<Entry>,
                 }
@@ -184,7 +184,7 @@ impl<S: AsyncWrite + AsyncRead + Unpin> Endpoint<S> {
             }
             RouterVersion::v0_5_0__ => {
                 #[derive(Debug, Deserialize)]
-                #[serde(deny_unknown_fields)]
+                #[cfg_attr(test, serde(deny_unknown_fields))]
                 struct Peers {
                     peers: Vec<PeerEntry>,
                 }
@@ -198,12 +198,12 @@ impl<S: AsyncWrite + AsyncRead + Unpin> Endpoint<S> {
     pub async fn get_sessions(&mut self) -> RequestResult<Vec<SessionEntry>> {
         if let RouterVersion::__v0_4_4 = self.router_version {
             #[derive(Debug, Deserialize)]
-            #[serde(deny_unknown_fields)]
+            #[cfg_attr(test, serde(deny_unknown_fields))]
             struct Entry {
                 key: String,
             }
             #[derive(Debug, Deserialize)]
-            #[serde(deny_unknown_fields)]
+            #[cfg_attr(test, serde(deny_unknown_fields))]
             struct Sessions {
                 sessions: HashMap<Ipv6Addr, Entry>,
             }
@@ -226,7 +226,7 @@ impl<S: AsyncWrite + AsyncRead + Unpin> Endpoint<S> {
             };
         }
         #[derive(Debug, Deserialize)]
-        #[serde(deny_unknown_fields)]
+        #[cfg_attr(test, serde(deny_unknown_fields))]
         struct Sessions {
             sessions: Vec<SessionEntry>,
         }
@@ -267,7 +267,7 @@ impl<S: AsyncWrite + AsyncRead + Unpin> Endpoint<S> {
         match self.router_version {
             RouterVersion::__v0_4_4 => {
                 #[derive(Debug, Deserialize)]
-                #[serde(deny_unknown_fields)]
+                #[cfg_attr(test, serde(deny_unknown_fields))]
                 struct Entry {
                     build_name: String,
                     build_version: String,
@@ -277,7 +277,7 @@ impl<S: AsyncWrite + AsyncRead + Unpin> Endpoint<S> {
                     subnet: String,
                 }
                 #[derive(Debug, Deserialize)]
-                #[serde(deny_unknown_fields)]
+                #[cfg_attr(test, serde(deny_unknown_fields))]
                 struct _SelfEntry {
                     #[serde(alias = "self")]
                     entry: HashMap<Ipv6Addr, Entry>,
@@ -299,7 +299,7 @@ impl<S: AsyncWrite + AsyncRead + Unpin> Endpoint<S> {
             }
             RouterVersion::v0_4_5__v0_4_7 => {
                 #[derive(Debug, Serialize, Deserialize)]
-                #[serde(deny_unknown_fields)]
+                #[cfg_attr(test, serde(deny_unknown_fields))]
                 pub struct Entry {
                     pub build_name: String,
                     pub build_version: String,
@@ -329,13 +329,13 @@ impl<S: AsyncWrite + AsyncRead + Unpin> Endpoint<S> {
         match self.router_version {
             RouterVersion::__v0_4_4 => {
                 #[derive(Debug, Deserialize)]
-                #[serde(deny_unknown_fields)]
+                #[cfg_attr(test, serde(deny_unknown_fields))]
                 struct Entry {
                     key: String,
                     path: Vec<u64>,
                 }
                 #[derive(Debug, Deserialize)]
-                #[serde(deny_unknown_fields)]
+                #[cfg_attr(test, serde(deny_unknown_fields))]
                 struct Paths {
                     paths: HashMap<Ipv6Addr, Entry>,
                 }
@@ -358,7 +358,7 @@ impl<S: AsyncWrite + AsyncRead + Unpin> Endpoint<S> {
             }
             RouterVersion::v0_4_5__v0_4_7 | RouterVersion::v0_5_0__ => {
                 #[derive(Debug, Deserialize)]
-                #[serde(deny_unknown_fields)]
+                #[cfg_attr(test, serde(deny_unknown_fields))]
                 struct Paths {
                     paths: Vec<PathEntry>,
                 }
@@ -373,14 +373,14 @@ impl<S: AsyncWrite + AsyncRead + Unpin> Endpoint<S> {
         match self.router_version {
             RouterVersion::__v0_4_4 => {
                 #[derive(Debug, Deserialize)]
-                #[serde(deny_unknown_fields)]
+                #[cfg_attr(test, serde(deny_unknown_fields))]
                 struct Entry {
                     key: String,
                     pub port: u64,
                     pub rest: u64,
                 }
                 #[derive(Debug, Deserialize)]
-                #[serde(deny_unknown_fields)]
+                #[cfg_attr(test, serde(deny_unknown_fields))]
                 struct Dht {
                     dht: HashMap<Ipv6Addr, Entry>,
                 }
@@ -404,7 +404,7 @@ impl<S: AsyncWrite + AsyncRead + Unpin> Endpoint<S> {
             // Not implemented in the router after v0.5.0
             RouterVersion::v0_4_5__v0_4_7 | RouterVersion::v0_5_0__ => {
                 #[derive(Debug, Deserialize)]
-                #[serde(deny_unknown_fields)]
+                #[cfg_attr(test, serde(deny_unknown_fields))]
                 struct Dht {
                     dht: Vec<DHTEntry>,
                 }
@@ -424,7 +424,7 @@ impl<S: AsyncWrite + AsyncRead + Unpin> Endpoint<S> {
     #[maybe_async]
     pub async fn get_multicast_interfaces(&mut self) -> RequestResult<Vec<String>> {
         #[derive(Debug, Deserialize)]
-        #[serde(deny_unknown_fields)]
+        #[cfg_attr(test, serde(deny_unknown_fields))]
         struct MulticastInterfaces {
             multicast_interfaces: Vec<String>,
         }
@@ -439,7 +439,7 @@ impl<S: AsyncWrite + AsyncRead + Unpin> Endpoint<S> {
     #[maybe_async]
     pub async fn get_tree(&mut self) -> RequestResult<Vec<TreeEntry>> {
         #[derive(Debug, Deserialize)]
-        #[serde(deny_unknown_fields)]
+        #[cfg_attr(test, serde(deny_unknown_fields))]
         struct Tree {
             tree: Vec<TreeEntry>,
         }
@@ -451,12 +451,12 @@ impl<S: AsyncWrite + AsyncRead + Unpin> Endpoint<S> {
     pub async fn list(&mut self) -> RequestResult<Vec<ListEntry>> {
         if let RouterVersion::__v0_4_4 = self.router_version {
             #[derive(Debug, Deserialize)]
-            #[serde(deny_unknown_fields)]
+            #[cfg_attr(test, serde(deny_unknown_fields))]
             struct Entry {
                 fields: Vec<String>,
             }
             #[derive(Debug, Deserialize)]
-            #[serde(deny_unknown_fields)]
+            #[cfg_attr(test, serde(deny_unknown_fields))]
             struct List {
                 list: HashMap<String, Entry>,
             }
@@ -477,7 +477,7 @@ impl<S: AsyncWrite + AsyncRead + Unpin> Endpoint<S> {
             };
         }
         #[derive(Debug, Deserialize)]
-        #[serde(deny_unknown_fields)]
+        #[cfg_attr(test, serde(deny_unknown_fields))]
         struct List {
             list: Vec<ListEntry>,
         }
