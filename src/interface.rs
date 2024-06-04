@@ -19,6 +19,9 @@ pub struct PeerEntry {
     pub uptime: Option<f64>,
     pub up: bool,
     pub inbound: bool,
+    #[serde(rename = "latency_ms")]
+    #[serde(default, deserialize_with = "parse_optional_duration_from_nanos")]
+    pub latency: Option<Duration>,
     pub last_error: Option<String>,
     #[serde(default, deserialize_with = "parse_optional_duration_from_nanos")]
     pub last_error_time: Option<Duration>,
@@ -129,6 +132,7 @@ impl<S: AsyncWrite + AsyncRead + Unpin> Endpoint<S> {
                                 priority: None,
                                 up: true,
                                 inbound: false,
+                                latency: None,
                                 last_error: None,
                                 last_error_time: None,
                             })
@@ -173,6 +177,7 @@ impl<S: AsyncWrite + AsyncRead + Unpin> Endpoint<S> {
                                 priority: None,
                                 up: true,
                                 inbound: false,
+                                latency: None,
                                 last_error: None,
                                 last_error_time: None,
                             })

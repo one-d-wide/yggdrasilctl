@@ -13,8 +13,8 @@ runtime is not in the list, consider creating an issue or pull request.
 
 # Compatibility
 
-Successfully tested with the `yggdrasil-go` of version `0.4.4`, `0.4.7`, `0.5.1`, `0.5.4`.
-You can test compatibility yourself by running `cargo test -p yggdrasilctl` from the crate directory.
+Successfully tested with the `yggdrasil-go` of versions: `0.4.4`, `0.4.7`, `0.5.1`, `0.5.4`, `0.5.5`, `0.5.6`.
+You can test compatibility yourself by running `YGGDRASIL_SOCKET="/run/yggdrasil/yggdrasil.sock" cargo test -p yggdrasilctl` from the crate directory.
 
 In version `0.4.5` (October 2022)
 a response structure for commands outputting a list has been changed,
