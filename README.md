@@ -1,6 +1,6 @@
 # yggdrasilctl
 
-A library for accessing [Admin API] of [Yggdrasil network router].
+A library for accessing [Admin API] of [Yggdrasil Network router].
 
 It supports both sync and async environment. All you need is to provide
 socket that implements either `Read` and `Write` traits from `std` for synchronous
@@ -9,21 +9,22 @@ Currently supported runtimes are `tokio` and `futures`. If your favorite
 runtime is not in the list, consider creating an issue or pull request.
 
 [Admin API]: https://yggdrasil-network.github.io/admin.html
-[Yggdrasil network router]: https://github.com/yggdrasil-network/yggdrasil-go
+[Yggdrasil Network router]: https://github.com/yggdrasil-network/yggdrasil-go
 
 # Compatibility
 
-Successfully tested with the `yggdrasil-go` of versions: `0.4.4`, `0.4.7`, `0.5.1`, `0.5.4`, `0.5.5`, `0.5.6`.
-You can test compatibility yourself by running `YGGDRASIL_SOCKET="/run/yggdrasil/yggdrasil.sock" cargo test -p yggdrasilctl` from the crate directory.
+This library is backward-compatible with the most existing versions of [`yggdrasil-go`], and have a prospect of forward-compatibility.
+Despite this, potential user should note that [`yggdrasil-go`] is still an experimental software.
+And there were seen breaking changes in the certain API calls, notably in versions `0.4.5` (October 2022), `0.5.0` (November 2023).
 
-In version `0.4.5` (October 2022)
-a response structure for commands outputting a list has been changed,
-new commands `addpeer`, `removepeer`, `gettun` have been added.
+Nevertheless, this library was successfully tested for compatibility with [`yggdrasil-go`] of versions: `0.4.4`, `0.4.7`, `0.5.1`, `0.5.4`, `0.5.5`, `0.5.6`.
+You can test compatibility yourself by running the following command in the crate directory.
 
-In version `0.5.0` (November 2023)
-`getdht` command has been removed, `gettree` command has been added.
+```sh
+$ YGGDRASIL_SOCKET="/run/yggdrasil/yggdrasil.sock" cargo test -p yggdrasilctl
+```
 
-[routers]: https://github.com/yggdrasil-network/yggdrasil-go
+[`yggdrasil-go`]: https://github.com/yggdrasil-network/yggdrasil-go
 
 # Basic usage
 
