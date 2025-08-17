@@ -72,13 +72,13 @@ impl<S: AsyncWrite + AsyncRead + Unpin> Endpoint<S> {
         };
 
         if let Ok(Ok(val)) = endpoint.request::<Value>("getself").await {
-            // Routers before v0.4.5 (response contains ".self.<addr>.build_version")
+            // Routers before v0.4.5 expose ".self.<addr>.build_version"
             if val.get("self").is_some() {
                 endpoint.router_version = RouterVersion::__v0_4_4;
                 return endpoint;
             }
 
-            // Routers from v0.4.5 to v0.4.* (".build_version")
+            // Routers from v0.4.5 expose ".build_version"
             if let Some(v) = val.get("build_version") {
                 if let Some(v) = v.as_str() {
                     let v: Vec<i32> = v

@@ -19,12 +19,18 @@ pub struct PeerEntry {
     pub uptime: Option<f64>,
     pub up: bool,
     pub inbound: bool,
-    #[serde(rename = "latency_ms")]
+    #[serde(alias = "latency_ms")]
     #[serde(default, deserialize_with = "parse_optional_duration_from_nanos")]
     pub latency: Option<Duration>,
     pub last_error: Option<String>,
     #[serde(default, deserialize_with = "parse_optional_duration_from_nanos")]
     pub last_error_time: Option<Duration>,
+    /// Since v0.5.9
+    pub cost: Option<u64>,
+    /// Since v0.5.10
+    pub rate_recvd: Option<u64>,
+    /// Since v0.5.10
+    pub rate_sent: Option<u64>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -135,6 +141,9 @@ impl<S: AsyncWrite + AsyncRead + Unpin> Endpoint<S> {
                                 latency: None,
                                 last_error: None,
                                 last_error_time: None,
+                                cost: None,
+                                rate_recvd: None,
+                                rate_sent: None,
                             })
                             .collect();
                         Ok(Ok(vec))
@@ -180,6 +189,9 @@ impl<S: AsyncWrite + AsyncRead + Unpin> Endpoint<S> {
                                 latency: None,
                                 last_error: None,
                                 last_error_time: None,
+                                cost: None,
+                                rate_recvd: None,
+                                rate_sent: None,
                             })
                             .collect();
                         Ok(Ok(vec))

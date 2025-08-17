@@ -17,7 +17,7 @@ This library is backward-compatible with the most existing versions of [`yggdras
 Despite this, potential user should note that [`yggdrasil-go`] is still an experimental software.
 And there were seen breaking changes in the certain API calls, notably in versions `0.4.5` (October 2022), `0.5.0` (November 2023).
 
-Nevertheless, this library was successfully tested for compatibility with [`yggdrasil-go`] of versions: `0.4.4`, `0.4.7`, `0.5.1`, `0.5.4`, `0.5.5`, `0.5.6`.
+Nevertheless, this library was successfully tested for compatibility with [`yggdrasil-go`] of versions: `0.4.4`, `0.4.7`, `0.5.1`, `0.5.4`, `0.5.5`, `0.5.6`, `0.5.12`.
 You can test compatibility yourself by running the following command in the crate directory.
 
 ```sh
