@@ -1,6 +1,6 @@
 [package]
 name = "yggdrasilctl"
-version = "1.2.2"
+version = "1.2.3"
 authors = ["Remy D. Farley <one-d-wide@protonmail.com>"]
 categories = ["network-programming"]
 description = "Blazingly fast Yggdrasil Admin API library"
